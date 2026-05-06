@@ -87,9 +87,9 @@ const dayL=d=>DAYS[new Date(d).getDay()];
 const fmtD=d=>{const t=new Date(d);return`${t.getDate()}/${t.getMonth()+1}/${t.getFullYear()}`};
 const ini=n=>n.split(" ").slice(0,2).map(w=>w[0]).join("").toUpperCase().substring(0,2);
 
-async function exportXL(emp,all,mo,yr){
+async function exportXL(emp,all,startDate,endDate){
   const rows=(all[emp.id]||[])
-    .filter(e=>{const d=new Date(e.date);return d.getMonth()===mo&&d.getFullYear()===yr})
+    .filter(e=>e.date>=startDate&&e.date<=endDate)
     .sort((a,b)=>new Date(a.date)-new Date(b.date));
 
   const wb=new ExcelJS.Workbook();
@@ -134,7 +134,7 @@ async function exportXL(emp,all,mo,yr){
     "ສາທາລະນະລັດ ປະຊາທິປະໄຕ ປະຊາຊົນລາວ",
     "ສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດທະນາຖາວອນ",
     `ສໍາຊອນການເຮັດລ່ວງເວລາຂອງພະນັກງານ ທ່ານ ${emp.name}`,
-    `ເດືອນ ${MONTHS[mo]} ປີ ${yr}`,
+    `ຊ່ວງວັນທີ ${startDate} ຫາ ${endDate}`,
   ];
   hdrTexts.forEach((txt,i)=>{
     const r=ws.addRow([txt]);
@@ -260,7 +260,7 @@ async function exportXL(emp,all,mo,yr){
   const buf=await wb.xlsx.writeBuffer();
   const url=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
   const a=document.createElement("a");a.href=url;
-  a.download=`OT_${emp.name}_${MONTHS[mo]}_${yr}.xlsx`;
+  a.download=`OT_${emp.name}_${startDate}_${endDate}.xlsx`;
   document.body.appendChild(a);a.click();document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
@@ -306,8 +306,18 @@ function App(){
   });
   const[entries,setEntries]=useState({});
   const[sel,setSel]=useState("1");
-  const[mo,setMo]=useState(new Date().getMonth());
-  const[yr,setYr]=useState(new Date().getFullYear());
+  // Default period: 21 of last month → 20 of this month
+  const[startDate,setStartDate]=useState(()=>{
+    const d=new Date();
+    const y=d.getDate()<=20?d.getFullYear():(d.getMonth()===11?d.getFullYear()+1:d.getFullYear());
+    const m=d.getDate()<=20?(d.getMonth()===0?11:d.getMonth()-1):d.getMonth();
+    const yr2=d.getDate()<=20&&d.getMonth()===0?d.getFullYear()-1:y;
+    return `${d.getDate()<=20?(d.getMonth()===0?d.getFullYear()-1:d.getFullYear()):d.getFullYear()}-${String(d.getDate()<=20?(d.getMonth()===0?12:d.getMonth()):d.getMonth()+1).padStart(2,"0")}-21`;
+  });
+  const[endDate,setEndDate]=useState(()=>{
+    const d=new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-20`;
+  });
   const[showAdd,setShowAdd]=useState(false);
   const[showEmp,setShowEmp]=useState(false);
   const[form,setForm]=useState({date:"",startTime:"17:30",endTime:"",remarks:""});
@@ -354,11 +364,8 @@ function App(){
 
   const emp=emps.find(e=>e.id===sel);
   const list=(entries[sel]||[])
-    .filter(e=>{const d=new Date(e.date);return d.getMonth()===mo&&d.getFullYear()===yr})
+    .filter(e=>e.date>=startDate&&e.date<=endDate)
     .sort((a,b)=>new Date(a.date)-new Date(b.date));
-
-  const prevMo=()=>{if(mo===0){setMo(11);setYr(y=>y-1)}else setMo(m=>m-1)};
-  const nextMo=()=>{if(mo===11){setMo(0);setYr(y=>y+1)}else setMo(m=>m+1)};
 
   const saveEntry=async()=>{
     if(!form.date||!form.startTime||!form.endTime)return;
@@ -426,7 +433,7 @@ function App(){
   const pb=calcBands(form.startTime,form.endTime,form.date);
   const pt=pb.reduce((a,b)=>a+b,0);
   const formWE=form.date?isWE(form.date):false;
-  const moCount=id=>(entries[id]||[]).filter(e=>{const d=new Date(e.date);return d.getMonth()===mo&&d.getFullYear()===yr}).length;
+  const moCount=id=>(entries[id]||[]).filter(e=>e.date>=startDate&&e.date<=endDate).length;
 
   const TH=({ch,center,green})=>(
     <th style={{padding:"8px 9px",textAlign:center?"center":"left",whiteSpace:"nowrap",
@@ -523,7 +530,7 @@ function App(){
                 borderLeft:s?"3px solid #fff":"3px solid transparent",
                 transition:"all .12s"}}>
                 <div style={{color:s?W:"rgba(255,255,255,.82)",fontSize:12,fontWeight:s?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.name}</div>
-                <div style={{color:s?"rgba(255,255,255,.6)":"rgba(255,255,255,.35)",fontSize:10,marginTop:2}}>{moCount(e.id)} ລາຍການ {MONTHS[mo]}</div>
+                <div style={{color:s?"rgba(255,255,255,.6)":"rgba(255,255,255,.35)",fontSize:10,marginTop:2}}>{moCount(e.id)} ລາຍການ</div>
               </div>
             );
           })}
@@ -554,14 +561,16 @@ function App(){
               {syncing?<span style={{color:"#FB8C00"}}>⟳ ກຳລັງ sync...</span>:loading?<span style={{color:"#90A4AE"}}>ກຳລັງໂຫລດ...</span>:<span>🟢 sync Supabase</span>}
             </div>}
           </div>
-          {/* month nav */}
-          <div style={{display:"flex",alignItems:"center",gap:1,background:"#F0F4FF",border:"1px solid #BBDEFB",borderRadius:8,padding:"2px 3px",flexShrink:0}}>
-            <button onClick={prevMo} style={{width:28,height:28,border:"none",background:"transparent",borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",color:"#1565C0"}}><IChL/></button>
-            <div style={{fontSize:isMob?11:12,fontWeight:600,color:"#1565C0",minWidth:isMob?100:140,textAlign:"center",padding:"0 2px"}}>{MONTHS[mo]} {yr}</div>
-            <button onClick={nextMo} style={{width:28,height:28,border:"none",background:"transparent",borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",color:"#1565C0"}}><IChR/></button>
+          {/* date range picker */}
+          <div style={{display:"flex",alignItems:"center",gap:4,background:"#F0F4FF",border:"1px solid #BBDEFB",borderRadius:8,padding:"4px 8px",flexShrink:0}}>
+            <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)}
+              style={{border:"none",background:"transparent",fontSize:isMob?10:12,fontWeight:600,color:"#1565C0",outline:"none",cursor:"pointer",padding:0,width:isMob?100:115}}/>
+            <span style={{color:"#90A4AE",fontSize:12,fontWeight:400}}>→</span>
+            <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)}
+              style={{border:"none",background:"transparent",fontSize:isMob?10:12,fontWeight:600,color:"#1565C0",outline:"none",cursor:"pointer",padding:0,width:isMob?100:115}}/>
           </div>
           {emp&&<>
-            {!isMob&&<button onClick={()=>exportXL(emp,entries,mo,yr).catch(console.error)} style={{padding:"7px 12px",background:"#F0F4FF",border:"1px solid #BBDEFB",borderRadius:7,fontSize:12,color:"#1565C0",display:"flex",alignItems:"center",gap:5,fontWeight:500,flexShrink:0}}>
+            {!isMob&&<button onClick={()=>exportXL(emp,entries,startDate,endDate).catch(console.error)} style={{padding:"7px 12px",background:"#F0F4FF",border:"1px solid #BBDEFB",borderRadius:7,fontSize:12,color:"#1565C0",display:"flex",alignItems:"center",gap:5,fontWeight:500,flexShrink:0}}>
               <IDl/> Export
             </button>}
             <button onClick={()=>setShowAdd(true)} style={{padding:isMob?"8px 10px":"7px 13px",background:"linear-gradient(135deg,#1565C0,#1E88E5)",border:"none",borderRadius:7,fontSize:isMob?12:12,color:W,display:"flex",alignItems:"center",gap:5,fontWeight:500,boxShadow:"0 2px 6px rgba(21,101,192,.3)",flexShrink:0}}>
@@ -596,7 +605,7 @@ function App(){
             <div style={{background:W,border:"1px solid #E0E7EF",borderRadius:10,padding:"60px 20px",textAlign:"center",boxShadow:"0 2px 8px rgba(21,101,192,.06)"}}>
               <div style={{width:58,height:58,borderRadius:"50%",background:"#E3F2FD",border:"2px solid #BBDEFB",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",color:"#1565C0"}}><IClock/></div>
               <div style={{fontSize:16,fontWeight:600,color:"#1565C0",marginBottom:5}}>ຍັງບໍ່ມີຂໍ້ມູນ OT</div>
-              <div style={{fontSize:13,color:GR,marginBottom:16}}>ສໍາລັບ {MONTHS[mo]} {yr}</div>
+              <div style={{fontSize:13,color:GR,marginBottom:16}}>ຊ່ວງ {startDate} ຫາ {endDate}</div>
               <button onClick={()=>setShowAdd(true)} style={{padding:"8px 20px",background:"linear-gradient(135deg,#1565C0,#1E88E5)",border:"none",borderRadius:7,fontSize:13,color:W,display:"inline-flex",alignItems:"center",gap:6,fontWeight:500,boxShadow:"0 2px 8px rgba(21,101,192,.3)"}}>
                 <IPlus/> ເພີ່ມ OT ລາຍການໃໝ່
               </button>
@@ -606,7 +615,7 @@ function App(){
               <div style={{background:"linear-gradient(135deg,#1565C0,#1976D2)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div style={{display:"flex",alignItems:"center",gap:7}}>
                   <div style={{width:3,height:14,background:G,borderRadius:2}}/>
-                  <span style={{color:W,fontSize:13,fontWeight:500}}>ຊົ່ວໂມງ OT — {MONTHS[mo]} {yr}</span>
+                  <span style={{color:W,fontSize:13,fontWeight:500}}>ຊົ່ວໂມງ OT: {startDate} → {endDate}</span>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <span style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"rgba(255,255,255,.5)"}}>
@@ -693,7 +702,7 @@ function App(){
         {/* ── MOBILE BOTTOM BAR ── */}
         {isMob&&emp&&(
           <div style={{position:"fixed",bottom:0,left:0,right:0,background:W,borderTop:"1px solid #E0E7EF",padding:"8px 14px",display:"flex",gap:8,zIndex:100,boxShadow:"0 -2px 10px rgba(21,101,192,.1)"}}>
-            <button onClick={()=>exportXL(emp,entries,mo,yr).catch(console.error)} style={{flex:1,padding:"11px",background:"#F0F4FF",border:"1px solid #BBDEFB",borderRadius:8,fontSize:13,color:"#1565C0",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontWeight:500}}>
+            <button onClick={()=>exportXL(emp,entries,startDate,endDate).catch(console.error)} style={{flex:1,padding:"11px",background:"#F0F4FF",border:"1px solid #BBDEFB",borderRadius:8,fontSize:13,color:"#1565C0",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontWeight:500}}>
               <IDl/> Export Excel
             </button>
             <button onClick={()=>setShowAdd(true)} style={{flex:1,padding:"11px",background:"linear-gradient(135deg,#1565C0,#1E88E5)",border:"none",borderRadius:8,fontSize:13,color:W,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontWeight:600,boxShadow:"0 2px 8px rgba(21,101,192,.35)"}}>
