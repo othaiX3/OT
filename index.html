@@ -325,6 +325,7 @@ function App(){
   const[sideOpen,setSideOpen]=useState(false);
   const[editId,setEditId]=useState(null);
   const[editForm,setEditForm]=useState({date:"",startTime:"",endTime:"",remarks:""});
+  const[confirmId,setConfirmId]=useState(null);
   const[isMob,setIsMob]=useState(window.innerWidth<640);
   const[loading,setLoading]=useState(true);
   const[syncing,setSyncing]=useState(false);
@@ -387,6 +388,7 @@ function App(){
   };
 
   const del=async(id)=>{
+    setConfirmId(null);
     // optimistic
     setEntries(p=>({...p,[sel]:(p[sel]||[]).filter(e=>e.id!==id)}));
     try{
@@ -394,7 +396,7 @@ function App(){
       if(error) throw error;
     }catch(e){
       console.error("delete error",e);
-      loadAll(); // reload on failure
+      loadAll();
     }
   };
 
@@ -676,7 +678,7 @@ function App(){
                           <td style={{...tdBase,textAlign:"center"}}>
                             <div style={{display:"flex",alignItems:"center",gap:2,justifyContent:"center"}}>
                               <button onClick={()=>openEdit(r)} style={{background:"none",border:"none",padding:3,borderRadius:4,color:"#1976D2",display:"flex",alignItems:"center"}}><IEdit/></button>
-                              <button onClick={()=>del(r.id)} style={{background:"none",border:"none",padding:3,borderRadius:4,color:"#E53935",display:"flex",alignItems:"center"}}><IDel/></button>
+                              <button onClick={()=>setConfirmId(r.id)} style={{background:"none",border:"none",padding:3,borderRadius:4,color:"#E53935",display:"flex",alignItems:"center"}}><IDel/></button>
                             </div>
                           </td>
                         </tr>
@@ -711,6 +713,43 @@ function App(){
           </div>
         )}
       </div>
+
+      {/* MODAL: CONFIRM DELETE */}
+      {confirmId&&(()=>{
+        const r=list.find(x=>x.id===confirmId);
+        return(
+          <div style={{position:"fixed",inset:0,background:"rgba(21,101,192,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:400}}>
+            <div style={{background:"#fff",borderRadius:12,width:320,maxWidth:"92vw",overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,.18)"}}>
+              {/* header */}
+              <div style={{background:"#C62828",padding:"13px 18px",display:"flex",alignItems:"center",gap:8}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/></svg>
+                <span style={{color:"#fff",fontSize:14,fontWeight:600}}>ຢືນຢັນການລົບ</span>
+              </div>
+              {/* body */}
+              <div style={{padding:"18px 18px 14px"}}>
+                <p style={{fontSize:13,color:"#333",marginBottom:10,lineHeight:1.6}}>
+                  ທ່ານຕ້ອງການລົບ OT ລາຍການນີ້ບໍ?
+                </p>
+                {r&&<div style={{background:"#FFF3F3",border:"1px solid #FFCDD2",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#C62828",lineHeight:1.8}}>
+                  <div>📅 ວັນທີ: <b>{fmtD(r.date)}</b> ({dayL(r.date)})</div>
+                  <div>⏰ ເວລາ: <b>{r.startTime}</b> → <b>{r.endTime}</b></div>
+                  <div>⌛ ລວມ: <b>{toS(calcBands(r.startTime,r.endTime,r.date).reduce((a,b)=>a+b,0))}</b></div>
+                </div>}
+                <p style={{fontSize:11,color:"#E53935",marginTop:10}}>⚠ ຂໍ້ມູນທີ່ລົບແລ້ວ ບໍ່ສາມາດຄືນໄດ້</p>
+              </div>
+              {/* buttons */}
+              <div style={{display:"flex",gap:8,padding:"0 18px 16px"}}>
+                <button onClick={()=>setConfirmId(null)} style={{flex:1,padding:"10px",background:"#F5F5F5",border:"1px solid #E0E0E0",borderRadius:8,fontSize:13,color:"#555",fontWeight:500,cursor:"pointer"}}>
+                  ຍົກເລີກ
+                </button>
+                <button onClick={()=>del(confirmId)} style={{flex:1,padding:"10px",background:"#C62828",border:"none",borderRadius:8,fontSize:13,color:"#fff",fontWeight:600,cursor:"pointer",boxShadow:"0 2px 6px rgba(198,40,40,.3)"}}>
+                  🗑 ລົບອອກ
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* MODAL: EDIT ENTRY */}
       {editId&&(
