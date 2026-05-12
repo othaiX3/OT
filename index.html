@@ -55,13 +55,13 @@ const toS=m=>{if(!m||m<=0)return"";const h=Math.floor(m/60),n=Math.round(m%60);r
   [0] 17:30–22:00  → ທຸກວັນ (ຈັນ–ສຸກ ແລະ ເສົາ–ອາທິດ)
   [1] 22:00–06:00  → ທຸກວັນ
   [2] 08:00–12:00  → ເສົາ–ອາທິດ ເທົ່ານັ້ນ
-  [3] 12:00–17:00  → ເສົາ–ອາທິດ ເທົ່ານັ້ນ
+  [3] 13:00–17:00  → ເສົາ–ອາທິດ ເທົ່ານັ້ນ
 */
 const BANDS=[
   {l:"17:30–22:00", s:17*60+30, e:22*60,        wk:true,  we:true },
   {l:"22:00–06:00", s:22*60,    e:24*60+6*60,   wk:true,  we:true },
   {l:"08:00–12:00", s:8*60,     e:12*60,        wk:false, we:true },
-  {l:"12:00–17:00", s:12*60,    e:17*60,        wk:false, we:true },
+  {l:"13:00–17:00", s:12*60,    e:17*60,        wk:false, we:true },
 ];
 
 const isWE=d=>[0,6].includes(new Date(d).getDay());
@@ -69,9 +69,10 @@ const isWE=d=>[0,6].includes(new Date(d).getDay());
 function calcBands(s0,e0,dateStr){
   if(!s0||!e0)return[0,0,0,0];
   const we=dateStr?isWE(dateStr):false;
-  const s=toM(s0);let e=toM(e0);
-  // ຂ້າມຄືນ: ສະເພາະ start >= 12:00 (ອາທຽນ/ແລງ) ເທົ່ານັ້ນ
-  // ຖ້າ start < 12:00 ແລ້ວ end < start = input ຜິດ → ໄດ້ 0
+  // weekend: ສະເໝີໃຊ້ 08:00 ເປັນຈຸດເລີ່ມ
+  const es=we?"08:00":s0;
+  const s=toM(es);let e=toM(e0);
+  // ຂ້າມຄືນ
   if(e<s && s>=12*60 && e<12*60) e+=1440;
   return BANDS.map(b=>{
     if(we?!b.we:!b.wk)return 0;
@@ -153,7 +154,7 @@ async function exportXL(emp,all,startDate,endDate){
   for(let c=1;c<=10;c++){ const cell=gap.getCell(c); cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:C.white}}; cell.border={top:{style:"thin",color:{argb:C.white}},bottom:{style:"thin",color:{argb:C.white}},left:{style:"thin",color:{argb:C.white}},right:{style:"thin",color:{argb:C.white}}}; }
 
   // ── COLUMN HEADERS (ແຖວ 6) ──────────────────────────
-  const heads=["ວັນທີ","ວັນ","ເລີ່ມ OT","ອອກ","ລວມ","17:30-22:00","22:00-06:00","08:00-12:00\n(ເສົາ-ອາທິດ)","12:00-17:00\n(ເສົາ-ອາທິດ)","ໝາຍເຫດ"];
+  const heads=["ວັນທີ","ວັນ","ເລີ່ມ OT","ກົດເຂົ້າ","ອອກ","17:30-22:00","22:00-06:00","08:00-12:00\n(ສ/ອ)","13:00-17:00\n(ສ/ອ)","ໝາຍເຫດ"];
   const colHdr=ws.addRow(heads);
   colHdr.height=38;
   heads.forEach((_,ci)=>{
@@ -183,7 +184,8 @@ async function exportXL(emp,all,startDate,endDate){
     const bc=we?"FFE8C84A":C.lightGray;
 
     const dr=ws.addRow([
-      fmtD(r.date), dayL(r.date), r.startTime, r.endTime, toS(tot)||"",
+      fmtD(r.date), dayL(r.date), we?"08:00":(r.startTime||"17:30"),
+      r.clockIn||"", r.endTime||"",
       toS(b[0])||"", toS(b[1])||"",
       we?(toS(b[2])||""):"—", we?(toS(b[3])||""):"—",
       r.remarks||""
@@ -194,10 +196,8 @@ async function exportXL(emp,all,startDate,endDate){
     sc(dr.getCell(1),tc,rowBg,true,10,"left",false,bc);
     // col 2: day
     sc(dr.getCell(2),we?C.amber:C.navyMid,rowBg,false,10,"left",false,bc);
-    // cols 3-4: times
-    [3,4].forEach(c=>sc(dr.getCell(c),tc,rowBg,false,10,"center",false,bc));
-    // col 5: total
-    sc(dr.getCell(5),tc,rowBg,true,11,"center",false,bc);
+    // cols 3-5: times
+    [3,4,5].forEach(c=>sc(dr.getCell(c),tc,rowBg,false,10,"center",false,bc));
     // col 6: band 0
     sc(dr.getCell(6),b[0]>0?C.navyMid:C.gray, b[0]>0?C.bandBlue:rowBg, b[0]>0,10,"center",false,bc);
     // col 7: band 1
@@ -293,8 +293,8 @@ const IUser =()=><Ic d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8
 const SUPA=supabase.createClient("https://ffwlrqakhkwvrcqymmnk.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmd2xycWFraGt3dnJjcXltbW5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5OTIwMDQsImV4cCI6MjA5MzU2ODAwNH0.jHBGwov2Nn19z6ZHIkLWqJdqWuBmorEjiN_klMpy-YM");
 
 // helpers: convert DB row ↔ app entry
-const rowToEntry=r=>({id:r.id,date:r.date,startTime:r.start_time,endTime:r.end_time,remarks:r.remarks||""});
-const entryToRow=(empId,e)=>({id:e.id,emp_id:empId,date:e.date,start_time:e.startTime,end_time:e.endTime,remarks:e.remarks||""});
+const rowToEntry=r=>({id:r.id,date:r.date,startTime:r.start_time,clockIn:r.clock_in||"",clockOut:r.clock_out||"",endTime:r.end_time,remarks:r.remarks||""});
+const entryToRow=(empId,e)=>({id:e.id,emp_id:empId,date:e.date,start_time:e.startTime,clock_in:e.clockIn||"",end_time:e.endTime,remarks:e.remarks||""});
 
 function App(){
   const[emps,setEmps]=useState(()=>{
@@ -320,11 +320,11 @@ function App(){
   });
   const[showAdd,setShowAdd]=useState(false);
   const[showEmp,setShowEmp]=useState(false);
-  const[form,setForm]=useState({date:"",startTime:"17:30",endTime:"",remarks:""});
+  const[form,setForm]=useState({date:"",startTime:"17:30",clockIn:"",clockOut:"",endTime:"",remarks:""});
   const[empN,setEmpN]=useState("");
   const[sideOpen,setSideOpen]=useState(false);
   const[editId,setEditId]=useState(null);
-  const[editForm,setEditForm]=useState({date:"",startTime:"",endTime:"",remarks:""});
+  const[editForm,setEditForm]=useState({date:"",startTime:"",clockIn:"",clockOut:"",endTime:"",remarks:""});
   const[confirmId,setConfirmId]=useState(null);
   const[isMob,setIsMob]=useState(window.innerWidth<640);
   const[loading,setLoading]=useState(true);
@@ -374,7 +374,7 @@ function App(){
     const entry={...form,id:Date.now()+""};
     // optimistic update
     setEntries(p=>({...p,[sel]:[...(p[sel]||[]),entry]}));
-    setForm({date:"",startTime:"17:30",endTime:"",remarks:""});
+    setForm({date:"",startTime:"17:30",clockIn:"",clockOut:"",endTime:"",remarks:""});
     setShowAdd(false);
     try{
       const{error}=await SUPA.from("ot_entries").insert(entryToRow(sel,entry));
@@ -400,7 +400,7 @@ function App(){
     }
   };
 
-  const openEdit=r=>{setEditId(r.id);setEditForm({date:r.date,startTime:r.startTime,endTime:r.endTime,remarks:r.remarks||""});};
+  const openEdit=r=>{setEditId(r.id);setEditForm({date:r.date,startTime:r.startTime,clockIn:r.clockIn||"",clockOut:r.clockOut||"",endTime:r.endTime,remarks:r.remarks||""});};
 
   const saveEdit=async()=>{
     setSyncing(true);
@@ -410,6 +410,7 @@ function App(){
     try{
       const{error}=await SUPA.from("ot_entries").update({
         start_time:editForm.startTime,
+        clock_in:editForm.clockIn||null,
         end_time:editForm.endTime,
         remarks:editForm.remarks
       }).eq("id",editId);
@@ -636,12 +637,12 @@ function App(){
                       <TH ch="ວັນທີ"/>
                       <TH ch="ວັນ"/>
                       <TH ch="ເລີ່ມ OT" center/>
+                      <TH ch="ກົດເຂົ້າ" center/>
                       <TH ch="ອອກ" center/>
-                      <TH ch="ລວມ" center/>
                       <TH ch="17:30–22:00" center/>
                       <TH ch="22:00–06:00" center/>
-                      <TH ch={<>08:00–12:00<br/><span style={{fontSize:9,opacity:.75}}>(ເສົາ-ອາທິດ)</span></>} center green/>
-                      <TH ch={<>12:00–17:00<br/><span style={{fontSize:9,opacity:.75}}>(ເສົາ-ອາທິດ)</span></>} center green/>
+                      <TH ch={<>08:00–12:00<br/><span style={{fontSize:9,opacity:.75}}>(ສ/ອ)</span></>} center green/>
+                      <TH ch={<>13:00–17:00<br/><span style={{fontSize:9,opacity:.75}}>(ເສົາ-ອາທິດ)</span></>} center green/>
                       <TH ch="ໝາຍເຫດ"/>
                       <TH ch="" center/>
                     </tr>
@@ -651,7 +652,7 @@ function App(){
                       const b=calcBands(r.startTime,r.endTime,r.date);
                       const tot=b.reduce((a,x)=>a+x,0);
                       const we=isWE(r.date);
-                      const rowBg=we?(ri%2===0?"#F1F8E9":"#DCEDC8"):(ri%2===0?W:"#F8FAFF");
+                      const rowBg=we?(ri%2===0?"#BBDEFB":"#90CAF9"):(ri%2===0?W:"#F8FAFF");
                       const bd=`1px solid ${LG}`;
                       const tdBase={padding:"7px 9px",borderBottom:bd,borderRight:bd,background:rowBg,fontSize:11};
                       return(
@@ -663,9 +664,9 @@ function App(){
                               {dayL(r.date)}
                             </span>
                           </td>
-                          <td style={{...tdBase,textAlign:"center",color:N}}>{r.startTime}</td>
-                          <td style={{...tdBase,textAlign:"center",color:N}}>{r.endTime}</td>
-                          <td style={{...tdBase,textAlign:"center",color:N,fontWeight:500,fontSize:12}}>{toS(tot)}</td>
+                          <td style={{...tdBase,textAlign:"center",color:"#546E7A"}}>{r.startTime||"17:30"}</td>
+                          <td style={{...tdBase,textAlign:"center",color:r.clockIn?"#1565C0":"#BDBDBD"}}>{r.clockIn||"—"}</td>
+                          <td style={{...tdBase,textAlign:"center",color:r.endTime?"#1565C0":"#BDBDBD",fontWeight:500}}>{r.endTime||"—"}</td>
                           {/* band 0: 17:30-22:00 (ທຸກວັນ) */}
                           {bandCell(b[0],b[0]>0,false,rowBg)}
                           {/* band 1: 22:00-06:00 (ທຸກວັນ) */}
@@ -684,16 +685,17 @@ function App(){
                         </tr>
                       );
                     })}
-                    {/* totals */}
+
+                    {/* ── ແຖວລວມລຸ່ມ ── */}
                     <tr>
-                      <td colSpan={4} style={{padding:"9px 10px",background:"#E3F2FD",borderTop:"2px solid #1565C0",color:"#1565C0",fontWeight:600,fontSize:12,textAlign:"right",borderRight:"1px solid #BBDEFB"}}>ລວມທັງໝົດ</td>
-                      <td style={{padding:"9px 9px",background:"#E3F2FD",borderTop:"2px solid #1565C0",textAlign:"center",fontWeight:600,color:"#1565C0",fontSize:13,borderRight:"1px solid #BBDEFB"}}>{toS(tmins)||"0:00"}</td>
-                      {btot.map((x,i)=>(
-                        <td key={i} style={{padding:"9px 9px",background:i>=2?"#E8F5E9":"#E3F2FD",borderTop:"2px solid #1565C0",textAlign:"center",fontWeight:600,color:x>0?(i>=2?"#2E7D32":"#1565C0"):"#BDBDBD",fontSize:12,borderRight:"1px solid #BBDEFB"}}>
-                          {toS(x)||"—"}
-                        </td>
-                      ))}
-                      <td colSpan={2} style={{background:"#E3F2FD",borderTop:"2px solid #1565C0"}}/>
+                      {/* ວັນທີ, ວັນ, ເລີ່ມ OT, ກົດເຂົ້າ, ອອກ = 5 cols → ລວມ label */}
+                      <td colSpan={5} style={{padding:"9px 12px",background:"#FFF9C4",borderTop:"2px solid #FBC02D",color:"#5D4037",fontWeight:700,fontSize:12,textAlign:"right",borderRight:"1px solid #F9A825"}}>ລວມທັງໝົດ</td>
+                      {/* 4 band cols */}
+                      <td style={{padding:"9px 8px",background:"#FFF9C4",borderTop:"2px solid #FBC02D",textAlign:"center",fontWeight:700,color:btot[0]>0?"#0D47A1":"#9E9E9E",fontSize:12,borderRight:"1px solid #F9A825"}}>{toS(btot[0])||"—"}</td>
+                      <td style={{padding:"9px 8px",background:"#FFF9C4",borderTop:"2px solid #FBC02D",textAlign:"center",fontWeight:700,color:btot[1]>0?"#0D47A1":"#9E9E9E",fontSize:12,borderRight:"1px solid #F9A825"}}>{toS(btot[1])||"—"}</td>
+                      <td style={{padding:"9px 8px",background:"#E8F5E9",borderTop:"2px solid #FBC02D",textAlign:"center",fontWeight:700,color:btot[2]>0?"#1B5E20":"#9E9E9E",fontSize:12,borderRight:"1px solid #F9A825"}}>{toS(btot[2])||"—"}</td>
+                      <td style={{padding:"9px 8px",background:"#E8F5E9",borderTop:"2px solid #FBC02D",textAlign:"center",fontWeight:700,color:btot[3]>0?"#1B5E20":"#9E9E9E",fontSize:12,borderRight:"1px solid #F9A825"}}>{toS(btot[3])||"—"}</td>
+                      <td colSpan={2} style={{background:"#FFF9C4",borderTop:"2px solid #FBC02D"}}/>
                     </tr>
                   </tbody>
                 </table>
@@ -763,21 +765,35 @@ function App(){
               </div>
               <button onClick={()=>setEditId(null)} style={{background:"none",border:"none",color:isMob?"#90A4AE":"rgba(255,255,255,.7)",padding:4}}><IX/></button>
             </div>
-            <div style={{padding:isMob?"16px 16px 20px":20,overflowY:isMob?"auto":"visible"}}>
-              <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:13,fontSize:12,color:GR}}>
-                <div style={{width:6,height:6,borderRadius:"50%",background:"#1E88E5"}}/>
-                {emp?.name} — {editForm.date}
+            <div style={{padding:"20px",overflowY:isMob?"auto":"visible"}}>
+              {/* ── ຊື່ + ວັນທີ ── */}
+              <div style={{background:"#F0F4FF",borderRadius:8,padding:"10px 14px",marginBottom:16}}>
+                <div style={{fontSize:11,color:"#90A4AE",marginBottom:6}}>{emp?.name}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <label style={{fontSize:12,color:"#1565C0",fontWeight:500,flexShrink:0}}>ວັນທີ:</label>
+                  <input type="date" value={editForm.date} onChange={e=>setEditForm(f=>({...f,date:e.target.value}))}
+                    style={{flex:1,border:"1px solid #BBDEFB",borderRadius:6,padding:"5px 10px",fontSize:13,color:"#1565C0",background:"#fff"}}/>
+                </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:13}}>
-                {[["ເລີ່ມ OT","startTime"],["ເວລາອອກ","endTime"]].map(([lbl,k])=>(
-                  <div key={k}>
-                    <label style={{display:"block",fontSize:12,color:"#1565C0",fontWeight:500,marginBottom:4}}>{lbl}</label>
-                    <input type="time" value={editForm[k]} onChange={e=>setEditForm(f=>({...f,[k]:e.target.value}))}
-                      style={{width:"100%",padding:isMob?"12px":"8px 10px",border:"1px solid #E0E7EF",borderRadius:8,fontSize:13,color:"#1565C0"}}/>
-                  </div>
-                ))}
+              {/* ── Row 1 ── */}
+              <div style={{display:"flex",gap:12,marginBottom:12}}>
+                <div style={{flex:1}}>
+                  <label style={{display:"block",fontSize:11,color:"#90A4AE",fontWeight:500,marginBottom:5}}>ເລີ່ມ OT (ຄົງທີ່)</label>
+                  <div style={{padding:"10px 12px",border:"1px solid #E0E7EF",borderRadius:8,fontSize:13,color:"#90A4AE",background:"#F5F5F5",fontWeight:600,height:42,display:"flex",alignItems:"center"}}>{editForm.startTime||"17:30"}</div>
+                </div>
+                <div style={{flex:1}}>
+                  <label style={{display:"block",fontSize:11,color:"#1565C0",fontWeight:500,marginBottom:5}}>ກົດເຂົ້າ (ເຊົ້າ)</label>
+                  <input type="time" value={editForm.clockIn||""} onChange={e=>setEditForm(f=>({...f,clockIn:e.target.value}))}
+                    style={{width:"100%",padding:"10px 12px",border:"1px solid #E0E7EF",borderRadius:8,fontSize:13,color:"#1565C0",boxSizing:"border-box"}}/>
+                </div>
               </div>
-              {(()=>{const pb2=calcBands(editForm.startTime,editForm.endTime,editForm.date);const pt2=pb2.reduce((a,b)=>a+b,0);return pt2>0&&(
+              {/* ── Row 2: ກົດອອກ ── */}
+              <div style={{marginBottom:14}}>
+                <label style={{display:"block",fontSize:11,color:"#1565C0",fontWeight:600,marginBottom:5}}>ກົດອອກ</label>
+                <input type="time" value={editForm.endTime} onChange={e=>setEditForm(f=>({...f,endTime:e.target.value,clockOut:e.target.value}))}
+                  style={{width:"100%",padding:"10px 12px",border:"2px solid #1565C0",borderRadius:8,fontSize:13,color:"#1565C0",fontWeight:500,boxSizing:"border-box"}}/>
+              </div>
+{(()=>{const pb2=calcBands(editForm.startTime,editForm.endTime,editForm.date);const pt2=pb2.reduce((a,b)=>a+b,0);return pt2>0&&(
                 <div style={{background:"#F0F4FF",borderLeft:"3px solid #1E88E5",borderRadius:"0 6px 6px 0",padding:"10px 12px",marginBottom:13}}>
                   <div style={{fontSize:11,color:GR,marginBottom:3}}>ສະຫຼຸບ OT ໃໝ່</div>
                   <div style={{fontSize:17,fontWeight:500,color:"#1565C0",marginBottom:6}}>{toS(pt2)} ຊົ່ວໂມງ</div>
@@ -814,41 +830,49 @@ function App(){
               </div>
               <button onClick={()=>setShowAdd(false)} style={{background:"none",border:"none",color:isMob?"#90A4AE":"rgba(255,255,255,.55)",padding:4}}><IX/></button>
             </div>
-            <div style={{padding:isMob?"16px 16px 20px":20,overflowY:isMob?"auto":"visible",flex:isMob?1:"auto"}}>
-              <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:13,fontSize:12,color:GR}}>
-                <div style={{width:6,height:6,borderRadius:"50%",background:"#1E88E5"}}/>
-                {emp?.name}
+            <div style={{padding:"20px",overflowY:isMob?"auto":"visible",flex:isMob?1:"auto"}}>
+              {/* ── ຊື່ + ວັນທີ ── */}
+              <div style={{background:"#F0F4FF",borderRadius:8,padding:"10px 14px",marginBottom:16}}>
+                <div style={{fontSize:11,color:"#90A4AE",marginBottom:6}}>{emp?.name}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <label style={{fontSize:12,color:"#1565C0",fontWeight:500,flexShrink:0}}>ວັນທີ:</label>
+                  <input type="date" value={form.date} onChange={e=>{
+                      const d=new Date(e.target.value);
+                      const we=[0,6].includes(d.getDay());
+                      setForm(f=>({...f,date:e.target.value,startTime:we?"08:00":"17:30"}));
+                    }}
+                    style={{flex:1,border:"1px solid #BBDEFB",borderRadius:6,padding:"5px 10px",fontSize:13,color:"#1565C0",background:"#fff"}}/>
+                </div>
+                {form.date&&<div style={{marginTop:7,display:"flex",alignItems:"center",gap:5}}>
+                  <span style={{fontSize:11,fontWeight:500,
+                    color:formWE?"#1B5E20":"#0D47A1",
+                    background:formWE?"#E8F5E9":"#E3F2FD",
+                    border:`1px solid ${formWE?"#66BB6A":"#BBDEFB"}`,
+                    padding:"2px 10px",borderRadius:10,display:"inline-flex",alignItems:"center",gap:5}}>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:formWE?"#43A047":"#1565C0",display:"inline-block"}}/>
+                    {dayL(form.date)} — {formWE?"ເສົາ/ອາທິດ (4 ຊ່ວງ)":"ວັນທຳມະດາ (2 ຊ່ວງ)"}
+                  </span>
+                </div>}
               </div>
-              {/* date */}
-              <div style={{marginBottom:13}}>
-                <label style={{display:"block",fontSize:12,color:N,fontWeight:500,marginBottom:4}}>ວັນທີ</label>
-                <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}
-                  style={{width:"100%",padding:isMob?"12px 12px":"8px 10px",border:`1px solid ${LG}`,borderRadius:8,fontSize:13,color:N}}/>
-                {form.date&&(
-                  <div style={{marginTop:6}}>
-                    <span style={{fontSize:11,fontWeight:500,
-                      color:formWE?"#1B5E20":"#0D47A1",
-                      background:formWE?"#E8F5E9":"#E3F2FD",
-                      border:`1px solid ${formWE?"#66BB6A":"#BBDEFB"}`,
-                      padding:"3px 10px",borderRadius:10,display:"inline-flex",alignItems:"center",gap:5}}>
-                      <span style={{width:6,height:6,borderRadius:"50%",background:formWE?G:NM,display:"inline-block"}}/>
-                      {dayL(form.date)} — {formWE?"ເສົາ/ອາທິດ: ໄລ່ 4 ຊ່ວງ":"ວັນທຳມະດາ: ໄລ່ 2 ຊ່ວງ"}
-                    </span>
-                  </div>
-                )}
+              {/* ── Row 1: ເລີ່ມ OT + ກົດເຂົ້າ ── */}
+              <div style={{display:"flex",gap:12,marginBottom:12}}>
+                <div style={{flex:1}}>
+                  <label style={{display:"block",fontSize:11,color:"#90A4AE",fontWeight:500,marginBottom:5}}>ເລີ່ມ OT (ຄົງທີ່)</label>
+                  <div style={{padding:"10px 12px",border:"1px solid #E0E7EF",borderRadius:8,fontSize:13,color:"#90A4AE",background:"#F5F5F5",fontWeight:600,height:42,display:"flex",alignItems:"center"}}>{form.startTime||"17:30"}</div>
+                </div>
+                <div style={{flex:1}}>
+                  <label style={{display:"block",fontSize:11,color:"#1565C0",fontWeight:500,marginBottom:5}}>ກົດເຂົ້າ (ເຊົ້າ)</label>
+                  <input type="time" value={form.clockIn} onChange={e=>setForm(f=>({...f,clockIn:e.target.value}))}
+                    style={{width:"100%",padding:"10px 12px",border:"1px solid #E0E7EF",borderRadius:8,fontSize:13,color:"#1565C0",boxSizing:"border-box"}}/>
+                </div>
               </div>
-              {/* times */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:13}}>
-                {[["ເລີ່ມ OT","startTime"],["ເວລາອອກ","endTime"]].map(([lbl,k])=>(
-                  <div key={k}>
-                    <label style={{display:"block",fontSize:12,color:N,fontWeight:500,marginBottom:4}}>{lbl}</label>
-                    <input type="time" value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
-                      style={{width:"100%",padding:isMob?"12px 12px":"8px 10px",border:`1px solid ${LG}`,borderRadius:8,fontSize:13,color:N}}/>
-                  </div>
-                ))}
+              {/* ── Row 2: ກົດອອກ ── */}
+              <div style={{marginBottom:14}}>
+                <label style={{display:"block",fontSize:11,color:"#1565C0",fontWeight:600,marginBottom:5}}>ກົດອອກ</label>
+                <input type="time" value={form.endTime} onChange={e=>setForm(f=>({...f,endTime:e.target.value,clockOut:e.target.value}))}
+                  style={{width:"100%",padding:"10px 12px",border:"2px solid #1565C0",borderRadius:8,fontSize:13,color:"#1565C0",fontWeight:500,boxSizing:"border-box"}}/>
               </div>
-              {/* live preview */}
-              {pt>0&&(
+{pt>0&&(
                 <div style={{background:OW,borderLeft:"3px solid #1E88E5",borderRadius:"0 6px 6px 0",padding:"10px 12px",marginBottom:13}}>
                   <div style={{fontSize:11,color:GR,marginBottom:3}}>ສະຫຼຸບ OT ວັນນີ້</div>
                   <div style={{fontSize:18,fontWeight:500,color:N,marginBottom:7}}>{toS(pt)} ຊົ່ວໂມງ</div>
