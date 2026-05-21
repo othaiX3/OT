@@ -55,13 +55,13 @@ const toS=m=>{if(!m||m<=0)return"";const h=Math.floor(m/60),n=Math.round(m%60);r
   [0] 17:30–22:00  → ທຸກວັນ (ຈັນ–ສຸກ ແລະ ເສົາ–ອາທິດ)
   [1] 22:00–06:00  → ທຸກວັນ
   [2] 08:00–12:00  → ເສົາ–ອາທິດ ເທົ່ານັ້ນ
-  [3] 13:00–17:00  → ເສົາ–ອາທິດ ເທົ່ານັ້ນ
+  [3] 12:00–16:00  → ເສົາ–ອາທິດ ເທົ່ານັ້ນ
 */
 const BANDS=[
   {l:"17:30–22:00", s:17*60+30, e:22*60,        wk:true,  we:true },
   {l:"22:00–06:00", s:22*60,    e:24*60+6*60,   wk:true,  we:true },
   {l:"08:00–12:00", s:8*60,     e:12*60,        wk:false, we:true },
-  {l:"13:00–17:00", s:12*60,    e:17*60,        wk:false, we:true },
+  {l:"12:00–16:00", s:12*60,    e:16*60,        wk:false, we:true },
 ];
 
 const isWE=d=>[0,6].includes(new Date(d).getDay());
@@ -91,172 +91,93 @@ const ini=n=>n.split(" ").slice(0,2).map(w=>w[0]).join("").toUpperCase().substri
 async function exportXL(emp,all,startDate,endDate){
   const rows=(all[emp.id]||[])
     .filter(e=>e.date>=startDate&&e.date<=endDate)
-    .sort((a,b)=>new Date(a.date)-new Date(b.date));
+    .sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
 
   const wb=new ExcelJS.Workbook();
-  wb.creator="LDB OT System";
   const ws=wb.addWorksheet("OT");
 
-  // ── Colours (ARGB: FF + hex) ───────────────────────
-  const C={
-    navy:"FF0B2B5C", navyMid:"FF143470", gold:"FFC8A415",
-    white:"FFFFFFFF", offWhite:"FFF7F5EE", gray:"FFCCCCCC",
-    green:"FF1A4A1A",
-    weBg:"FFFFFBEC",  weAlt:"FFFFF5D6",
-    totBg:"FFFDFAF0", totWE:"FFFFF9E6",
-    bandBlue:"FFEBF3FF", bandGold:"FFFFF3CC",
-    naCell:"FFF0F0F0", lightGray:"FFDDDDDD",
-    amber:"FF7A5C00", darkNavy:"FF3D2A00",
-  };
-
-  // ── Helper: style a cell ────────────────────────────
-  const sc=(cell,fg,bg,bold,sz,halign,wrapText,borderColor,borderTop)=>{
-    cell.font={name:"Phetsarath OT",bold:!!bold,size:sz||10,color:{argb:fg||C.navy}};
-    cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:bg||C.white}};
-    cell.alignment={horizontal:halign||"center",vertical:"middle",wrapText:!!wrapText};
-    const thin=(argb)=>({style:"thin",color:{argb}});
-    const med =(argb)=>({style:"medium",color:{argb}});
-    const bc=borderColor||C.lightGray;
-    cell.border={
-      top:   borderTop?med(borderTop):thin(bc),
-      bottom:borderTop?med(borderTop):thin(bc),
-      left:  thin(bc), right: thin(bc)
-    };
-  };
-
-  // ── Column widths ───────────────────────────────────
   ws.columns=[
     {width:13},{width:9},{width:10},{width:10},{width:10},
-    {width:13},{width:13},{width:16},{width:16},{width:18}
+    {width:13},{width:13},{width:13},{width:13},{width:18}
   ];
 
-  // ── HEADER (ແຖວ 1-4) ────────────────────────────────
-  const hdrTexts=[
-    "ສາທາລະນະລັດ ປະຊາທິປະໄຕ ປະຊາຊົນລາວ",
-    "ສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດທະນາຖາວອນ",
-    `ສໍາຊອນການເຮັດລ່ວງເວລາຂອງພະນັກງານ ທ່ານ ${emp.name}`,
-    `ຊ່ວງວັນທີ ${startDate} ຫາ ${endDate}`,
-  ];
-  hdrTexts.forEach((txt,i)=>{
-    const r=ws.addRow([txt]);
-    r.height=i%2===0?22:17;
-    ws.mergeCells(i+1,1,i+1,10);
-    const bold=i===0||i===2, bg=i%2===0?C.white:C.offWhite;
-    sc(r.getCell(1),C.navy,bg,bold,i===2?12:11,"center",false,C.lightGray);
-    // fill remaining merged cells too
-    for(let c=2;c<=10;c++) sc(r.getCell(c),C.navy,bg,bold,11,"center",false,C.lightGray);
+  const thin={style:"thin",color:{argb:"FF000000"}};
+  const bd={top:thin,bottom:thin,left:thin,right:thin};
+
+  const cell=(row,col,val,bold,align,wrap)=>{
+    const c=row.getCell(col);
+    c.value=val;
+    c.font={name:"Phetsarath OT",bold:!!bold,size:10,color:{argb:"FF000000"}};
+    c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFFFFF"}};
+    c.alignment={horizontal:align||"center",vertical:"middle",wrapText:!!wrap};
+    c.border=bd;
+  };
+
+  // ── Header ──
+  const hr=ws.addRow([]);hr.height=32;
+  ["ວັນທີ","ວັນ","ເລີ່ມ OT","ກົດເຂົ້າ","ອອກ",
+   "17:30-22:00","22:00-06:00","08:00-12:00 (ສ/ອ)","12:00-16:00 (ສ/ອ)","ໝາຍເຫດ"]
+  .forEach((h,i)=>{
+    const c=hr.getCell(i+1);
+    c.value=h;
+    c.font={name:"Phetsarath OT",bold:true,size:10};
+    c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFFFFF"}};
+    c.alignment={horizontal:"center",vertical:"middle",wrapText:true};
+    c.border=bd;
   });
 
-  // ── Gap row (ແຖວ 5) ─────────────────────────────────
-  const gap=ws.addRow([]);
-  gap.height=5;
-  ws.mergeCells(5,1,5,10);
-  for(let c=1;c<=10;c++){ const cell=gap.getCell(c); cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:C.white}}; cell.border={top:{style:"thin",color:{argb:C.white}},bottom:{style:"thin",color:{argb:C.white}},left:{style:"thin",color:{argb:C.white}},right:{style:"thin",color:{argb:C.white}}}; }
-
-  // ── COLUMN HEADERS (ແຖວ 6) ──────────────────────────
-  const heads=["ວັນທີ","ວັນ","ເລີ່ມ OT","ກົດເຂົ້າ","ອອກ","17:30-22:00","22:00-06:00","08:00-12:00\n(ສ/ອ)","13:00-17:00\n(ສ/ອ)","ໝາຍເຫດ"];
-  const colHdr=ws.addRow(heads);
-  colHdr.height=38;
-  heads.forEach((_,ci)=>{
-    const cell=colHdr.getCell(ci+1);
-    const isWE=ci>=7;
-    cell.font={name:"Phetsarath OT",bold:true,size:10,color:{argb:C.white}};
-    cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:isWE?C.green:C.navy}};
-    cell.alignment={horizontal:"center",vertical:"middle",wrapText:true};
-    cell.border={
-      top:{style:"medium",color:{argb:C.gold}},
-      bottom:{style:"medium",color:{argb:C.gold}},
-      left:{style:"thin",color:{argb:C.white}},
-      right:{style:"thin",color:{argb:C.white}}
-    };
-  });
-
-  // ── DATA ROWS ────────────────────────────────────────
-  const tb=[0,0,0,0]; let tm=0;
-  rows.forEach((r,ri)=>{
-    const b=calcBands(r.startTime,r.endTime,r.date);
-    const tot=b.reduce((a,x)=>a+x,0);
+  // ── Data ──
+  const tb=[0,0,0,0];
+  rows.forEach(r=>{
     const we=isWE(r.date);
-    tm+=tot; b.forEach((x,i)=>tb[i]+=x);
-    const alt=ri%2!==0;
-    const rowBg=we?(alt?C.weAlt:C.weBg):(alt?C.offWhite:C.white);
-    const tc=we?C.amber:C.navy;
-    const bc=we?"FFE8C84A":C.lightGray;
-
-    const dr=ws.addRow([
-      fmtD(r.date), dayL(r.date), we?"08:00":(r.startTime||"17:30"),
-      r.clockIn||"", r.endTime||"",
-      toS(b[0])||"", toS(b[1])||"",
-      we?(toS(b[2])||""):"—", we?(toS(b[3])||""):"—",
-      r.remarks||""
-    ]);
-    dr.height=20;
-
-    // col 1: date
-    sc(dr.getCell(1),tc,rowBg,true,10,"left",false,bc);
-    // col 2: day
-    sc(dr.getCell(2),we?C.amber:C.navyMid,rowBg,false,10,"left",false,bc);
-    // cols 3-5: times
-    [3,4,5].forEach(c=>sc(dr.getCell(c),tc,rowBg,false,10,"center",false,bc));
-    // col 6: band 0
-    sc(dr.getCell(6),b[0]>0?C.navyMid:C.gray, b[0]>0?C.bandBlue:rowBg, b[0]>0,10,"center",false,bc);
-    // col 7: band 1
-    sc(dr.getCell(7),b[1]>0?C.navyMid:C.gray, b[1]>0?C.bandBlue:rowBg, b[1]>0,10,"center",false,bc);
-    // col 8: band 2 (WE only)
-    if(we) sc(dr.getCell(8),b[2]>0?C.amber:C.gray, b[2]>0?C.bandGold:rowBg, b[2]>0,10,"center",false,"FFE8C84A");
-    else { const cell=dr.getCell(8); cell.value="—"; cell.font={name:"Phetsarath OT",size:10,color:{argb:C.gray}}; cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:C.naCell}}; cell.alignment={horizontal:"center",vertical:"middle"}; cell.border={top:{style:"thin",color:{argb:C.lightGray}},bottom:{style:"thin",color:{argb:C.lightGray}},left:{style:"thin",color:{argb:C.lightGray}},right:{style:"thin",color:{argb:C.lightGray}}}; }
-    // col 9: band 3 (WE only)
-    if(we) sc(dr.getCell(9),b[3]>0?C.amber:C.gray, b[3]>0?C.bandGold:rowBg, b[3]>0,10,"center",false,"FFE8C84A");
-    else { const cell=dr.getCell(9); cell.value="—"; cell.font={name:"Phetsarath OT",size:10,color:{argb:C.gray}}; cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:C.naCell}}; cell.alignment={horizontal:"center",vertical:"middle"}; cell.border={top:{style:"thin",color:{argb:C.lightGray}},bottom:{style:"thin",color:{argb:C.lightGray}},left:{style:"thin",color:{argb:C.lightGray}},right:{style:"thin",color:{argb:C.lightGray}}}; }
-    // col 10: remarks
-    sc(dr.getCell(10),tc,rowBg,false,10,"left",false,bc);
+    const b=calcBands(r.startTime||"17:30",r.endTime,r.date);
+    b.forEach((x,i)=>tb[i]+=x);
+    const dr=ws.addRow([]);dr.height=18;
+    [
+      [fmtD(r.date),"left"],
+      [dayL(r.date),"center"],
+      [we?"08:00":(r.startTime||"17:30"),"center"],
+      [r.clockIn||"—","center"],
+      [r.endTime||"—","center"],
+      [b[0]>0?toS(b[0]):"—","center",true],
+      [b[1]>0?toS(b[1]):"—","center",true],
+      [we?(b[2]>0?toS(b[2]):"—"):"—","center"],
+      [we?(b[3]>0?toS(b[3]):"—"):"—","center"],
+      [r.remarks||"","left"]
+    ].forEach(([v,al,bold],i)=>{
+      const c=dr.getCell(i+1);
+      c.value=v;
+      c.font={name:"Phetsarath OT",bold:!!bold,size:10};
+      c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFFFFF"}};
+      c.alignment={horizontal:al,vertical:"middle"};
+      c.border=bd;
+    });
   });
 
-  // ── TOTAL ROW ────────────────────────────────────────
-  const totRow=ws.addRow(["ລວມທັງໝົດ","","","",toS(tm)||"0:00",toS(tb[0])||"0:00",toS(tb[1])||"0:00",toS(tb[2])||"0:00",toS(tb[3])||"0:00",""]);
-  totRow.height=22;
-  ws.mergeCells(totRow.number,1,totRow.number,4);
-  const totBorder=(we2)=>({top:{style:"medium",color:{argb:C.gold}},bottom:{style:"medium",color:{argb:C.gold}},left:{style:"thin",color:{argb:C.lightGray}},right:{style:"thin",color:{argb:C.lightGray}}});
-  [1,2,3,4].forEach(c=>{const cell=totRow.getCell(c);cell.font={name:"Phetsarath OT",bold:true,size:11,color:{argb:C.navy}};cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:C.totBg}};cell.alignment={horizontal:c===1?"right":"center",vertical:"middle"};cell.border=totBorder();});
-  [5,6,7].forEach(c=>{const cell=totRow.getCell(c);cell.font={name:"Phetsarath OT",bold:true,size:11,color:{argb:C.navy}};cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:C.totBg}};cell.alignment={horizontal:"center",vertical:"middle"};cell.border=totBorder();});
-  [8,9].forEach(c=>{const cell=totRow.getCell(c);cell.font={name:"Phetsarath OT",bold:true,size:11,color:{argb:C.amber}};cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:C.totWE}};cell.alignment={horizontal:"center",vertical:"middle"};cell.border=totBorder();});
-  {const cell=totRow.getCell(10);cell.font={name:"Phetsarath OT",bold:true,size:11,color:{argb:C.navy}};cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:C.totBg}};cell.alignment={horizontal:"center",vertical:"middle"};cell.border=totBorder();}
+  // ── Total ──
+  const tr=ws.addRow([]);tr.height=20;
+  // Merge A-E (cols 1-5) for ລວມທັງໝົດ label
+  ws.mergeCells(tr.number,1,tr.number,5);
+  // Set values for band cols only
+  [tb[0]>0?toS(tb[0]):"—",tb[1]>0?toS(tb[1]):"—",
+   tb[2]>0?toS(tb[2]):"—",tb[3]>0?toS(tb[3]):"—",""]
+  .forEach((v,i)=>{
+    const c=tr.getCell(i+6);
+    c.value=v;
+    c.font={name:"Phetsarath OT",bold:true,size:10};
+    c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFFFFF"}};
+    c.alignment={horizontal:"center",vertical:"middle"};
+    c.border=bd;
+  });
+  // Merged label cell
+  const lbl=tr.getCell(1);
+  lbl.value="ລວມທັງໝົດ";
+  lbl.font={name:"Phetsarath OT",bold:true,size:10};
+  lbl.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFFFFF"}};
+  lbl.alignment={horizontal:"center",vertical:"middle"};
+  lbl.border=bd;
 
-  // ── Gap row ──────────────────────────────────────────
-  const gap2=ws.addRow([]);gap2.height=6;
-  ws.mergeCells(gap2.number,1,gap2.number,10);
-  for(let c=1;c<=10;c++){const cell=gap2.getCell(c);cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:C.white}};cell.border={top:{style:"thin",color:{argb:C.white}},bottom:{style:"thin",color:{argb:C.white}},left:{style:"thin",color:{argb:C.white}},right:{style:"thin",color:{argb:C.white}}};}
-
-  // ── SIGNATURE ROW ────────────────────────────────────
-  const sigRow=ws.addRow(["ຜູ້ລາຍງານ: ..............................  ວັນທີ: ..........","","","","","ຫົວໜ້າໜ່ວຍ: ...............................","","","ຜູ້ອໍານວຍການ: ...............................",""])
-  sigRow.height=28;
-  ws.mergeCells(sigRow.number,1,sigRow.number,4);
-  ws.mergeCells(sigRow.number,6,sigRow.number,8);
-  ws.mergeCells(sigRow.number,9,sigRow.number,10);
-  for(let c=1;c<=10;c++){const cell=sigRow.getCell(c);cell.font={name:"Phetsarath OT",size:10,color:{argb:C.navy}};cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:C.offWhite}};cell.alignment={horizontal:"left",vertical:"middle"};cell.border={top:{style:"thin",color:{argb:C.lightGray}},bottom:{style:"thin",color:{argb:C.lightGray}},left:{style:"thin",color:{argb:C.lightGray}},right:{style:"thin",color:{argb:C.lightGray}}};}
-
-  // ── Export ───────────────────────────────────────────
-
-  // footer gap
-  const gap3=ws.addRow([]);gap3.height=8;
-  ws.mergeCells(gap3.number,1,gap3.number,10);
-  for(let c=1;c<=10;c++){const cell=gap3.getCell(c);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};cell.border={top:{style:'thin',color:{argb:'FFFFFFFF'}},bottom:{style:'thin',color:{argb:'FFFFFFFF'}},left:{style:'thin',color:{argb:'FFFFFFFF'}},right:{style:'thin',color:{argb:'FFFFFFFF'}}};}
-
-  // FOOTER 1: contact (white)
-  const ftC=ws.addRow(['  www.ldblao.la          ldblaoho@ldblao.la          LDB Bank          LDBBLALA','','','','','','','','','']);
-  ftC.height=22;ws.mergeCells(ftC.number,1,ftC.number,10);
-  for(let c=1;c<=10;c++){const cell=ftC.getCell(c);cell.font={name:'Arial',size:10,color:{argb:'FF0066AA'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};cell.alignment={horizontal:'center',vertical:'middle'};cell.border={top:{style:'medium',color:{argb:'FF0099CC'}},bottom:{style:'thin',color:{argb:'FFB0D8F0'}},left:{style:'thin',color:{argb:'FFB0D8F0'}},right:{style:'thin',color:{argb:'FFB0D8F0'}}};}
-
-  // FOOTER 2: Lao address (blue)
-  const ftL=ws.addRow(['  ທະນາຄານ ພັດທະນາລາວ ສາຂາໂພນສະຫວ່ານ,  ຕັ້ງຢູ່ ວິລະສອນ,  ເມືອງແປກ,  ແຂວງຊຽງຂວາງ,  ສປປ ລາວ','','','','','','','','','']);
-  ftL.height=20;ws.mergeCells(ftL.number,1,ftL.number,10);
-  for(let c=1;c<=10;c++){const cell=ftL.getCell(c);cell.font={name:'Phetsarath OT',size:10,color:{argb:'FFFFFFFF'},bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF0088BB'}};cell.alignment={horizontal:'center',vertical:'middle'};cell.border={top:{style:'thin',color:{argb:'FF006699'}},bottom:{style:'thin',color:{argb:'FF006699'}},left:{style:'thin',color:{argb:'FF006699'}},right:{style:'thin',color:{argb:'FF006699'}}};}
-
-  // FOOTER 3: English address (darker blue)
-  const ftE=ws.addRow(['  Phonsavan Branch,  Vilason Road,  Phonsavang Village,  Pek District,  Xiengkhouang Province,  Lao P.D.R,  P.O box: 2700','','','','','','','','','']);
-  ftE.height=20;ws.mergeCells(ftE.number,1,ftE.number,10);
-  for(let c=1;c<=10;c++){const cell=ftE.getCell(c);cell.font={name:'Arial',size:9,color:{argb:'FFFFFFFF'},bold:true,italic:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF006699'}};cell.alignment={horizontal:'center',vertical:'middle'};cell.border={top:{style:'thin',color:{argb:'FF005588'}},bottom:{style:'medium',color:{argb:'FF004477'}},left:{style:'thin',color:{argb:'FF005588'}},right:{style:'thin',color:{argb:'FF005588'}}};}
-
+  // ── Export ──
   const buf=await wb.xlsx.writeBuffer();
   const url=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
   const a=document.createElement("a");a.href=url;
@@ -341,6 +262,10 @@ function App(){
         if(!map[r.emp_id]) map[r.emp_id]=[];
         map[r.emp_id].push(rowToEntry(r));
       });
+      // ລຽງຕາມວັນທີ
+      Object.keys(map).forEach(id=>{
+        map[id].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+      });
       setEntries(map);
     }catch(e){console.error("load error",e);}
     finally{setLoading(false);}
@@ -366,7 +291,7 @@ function App(){
   const emp=emps.find(e=>e.id===sel);
   const list=(entries[sel]||[])
     .filter(e=>e.date>=startDate&&e.date<=endDate)
-    .sort((a,b)=>new Date(a.date)-new Date(b.date));
+    .sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
 
   const saveEntry=async()=>{
     if(!form.date||!form.startTime||!form.endTime)return;
@@ -642,7 +567,7 @@ function App(){
                       <TH ch="17:30–22:00" center/>
                       <TH ch="22:00–06:00" center/>
                       <TH ch={<>08:00–12:00<br/><span style={{fontSize:9,opacity:.75}}>(ສ/ອ)</span></>} center green/>
-                      <TH ch={<>13:00–17:00<br/><span style={{fontSize:9,opacity:.75}}>(ເສົາ-ອາທິດ)</span></>} center green/>
+                      <TH ch={<>12:00–16:00<br/><span style={{fontSize:9,opacity:.75}}>(ເສົາ-ອາທິດ)</span></>} center green/>
                       <TH ch="ໝາຍເຫດ"/>
                       <TH ch="" center/>
                     </tr>
@@ -673,7 +598,7 @@ function App(){
                           {bandCell(b[1],b[1]>0,false,rowBg)}
                           {/* band 2: 08:00-12:00 (ເສົາ-ອາທິດ) */}
                           {we?bandCell(b[2],b[2]>0,true,rowBg):<td style={{...tdBase,background:"#F5F5F5",textAlign:"center",color:"#BDBDBD",fontSize:10}}>—</td>}
-                          {/* band 3: 12:00-17:00 (ເສົາ-ອາທິດ) */}
+                          {/* band 3: 12:00-16:00 (ເສົາ-ອາທິດ) */}
                           {we?bandCell(b[3],b[3]>0,true,rowBg):<td style={{...tdBase,background:"#F5F5F5",textAlign:"center",color:"#BDBDBD",fontSize:10}}>—</td>}
                           <td style={{...tdBase,color:GR,maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.remarks||""}</td>
                           <td style={{...tdBase,textAlign:"center"}}>
