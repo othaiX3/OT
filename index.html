@@ -242,11 +242,9 @@ tfoot td{padding:12px;background:#F7FAFE;border-top:2px solid var(--line);font-w
 .fldbtn.mini.on{box-shadow:none;background:var(--tint)}
 
 .popmask{position:fixed;inset:0;z-index:9500}
-.pop{z-index:9501}
-.pop-sheet{z-index:9501}
-.pop{position:fixed;z-index:601;background:var(--surf);border:1px solid var(--line);border-radius:16px;
+.pop{position:fixed;z-index:9501;background:var(--surf);border:1px solid var(--line);border-radius:16px;
   box-shadow:var(--sh-3);overflow:hidden;animation:pop-in .16s ease}
-.pop-sheet{position:fixed;left:0;right:0;bottom:0;z-index:601;background:var(--surf);border-radius:20px 20px 0 0;
+.pop-sheet{position:fixed;left:0;right:0;bottom:0;z-index:9501;background:var(--surf);border-radius:20px 20px 0 0;
   box-shadow:var(--sh-3);animation:sheet-in .24s cubic-bezier(.3,.8,.3,1);padding-bottom:env(safe-area-inset-bottom)}
 .pop-h{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-bottom:1px solid var(--line-2)}
 .pop-h b{font-size:13.5px;font-weight:600;color:var(--ink)}
@@ -296,9 +294,9 @@ input.tbig::placeholder{color:#C6D3DF}
 .emp{display:flex;align-items:center;gap:10px}
 .emp .txt{display:block;flex:1;min-width:0}
 .menu{padding:6px}
-.menu button{width:100%;height:44px;border-radius:11px;display:flex;align-items:center;gap:11px;padding:0 12px;
+.menu button,.menu .pick{width:100%;height:44px;border-radius:11px;display:flex;cursor:pointer;align-items:center;gap:11px;padding:0 12px;
   font-size:13.5px;font-weight:500;color:var(--ink)}
-.menu button:hover{background:var(--tint)}
+.menu button:hover,.menu .pick:hover{background:var(--tint)}
 .menu button.rm{color:var(--danger)}
 .menu button.rm:hover{background:#FEECEC}
 
@@ -1253,9 +1251,11 @@ function App(){
       <Pop anchor={avRef.current} isMob={isMob} onClose={()=>setAvMenu(false)} width={228}>
         {isMob&&<div className="grab"/>}
         <div className="menu">
-          <button onClick={()=>{setAvMenu(false);fileRef.current&&fileRef.current.click()}}>
+          <label className="pick">
             <ICam s={16}/> {emp&&emp.photo_url?"ປ່ຽນຮູບ":"ອັບໂຫຼດຮູບ"}
-          </button>
+            <input type="file" accept="image/*" style={{display:"none"}}
+              onChange={e=>{setAvMenu(false);onPickPhoto(e)}}/>
+          </label>
           {emp&&emp.photo_url&&(
             <button className="rm" onClick={removePhoto}><IDel s={16}/> ລຶບຮູບອອກ</button>
           )}
