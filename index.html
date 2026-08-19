@@ -325,6 +325,34 @@ input.tbig::placeholder{color:#C6D3DF}
 @media(max-width:820px){
   .fld.tin{font-size:18px}
 }
+
+/* ── ໜ້າກວດກັບລະບົບ ທພລ ── */
+.drop{display:block;border:2px dashed #CFDEEE;border-radius:14px;padding:30px 20px;text-align:center;
+  cursor:pointer;background:#FAFCFF;transition:.15s}
+.drop:hover{border-color:var(--brand);background:var(--tint)}
+.drop b{display:block;font-size:14px;font-weight:600;color:var(--ink);margin:12px 0 5px}
+.drop span{font-size:12px;color:var(--muted);line-height:1.7}
+.sum{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+.sum span{font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:20px;border:1px solid var(--line);
+  background:var(--surf);color:var(--ink-2)}
+.sum span b{font-weight:700}
+.ckwarn{background:#FFF8E7;border:1px solid #F3E0B5;border-radius:12px;padding:11px 13px;
+  font-size:12px;color:#8A6417;margin-bottom:12px;line-height:1.7}
+.ck{border:1px solid var(--line);border-left:3px solid var(--c);border-radius:12px;
+  padding:11px 13px;margin-bottom:8px;background:var(--surf)}
+.ck.done{opacity:.45}
+.ck .h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ck .d{font-size:13.5px;font-weight:700;color:var(--ink)}
+.ck .d em{font-style:normal;font-weight:500;font-size:11.5px;color:var(--muted);margin-left:6px}
+.ck .tag{font-size:10.5px;font-weight:700;color:var(--c);white-space:nowrap}
+.ck .cmp{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12px;color:var(--ink-2)}
+.ck .cmp u{text-decoration:none;color:var(--muted)}
+.ck .cmp s{text-decoration:line-through;color:#B0BFCC}
+.ck .cmp b{color:var(--danger);font-weight:700}
+.ck .act{margin-top:10px;height:32px;border-radius:9px;border:1px solid var(--line);
+  font-size:12px;font-weight:600;color:var(--brand);padding:0 14px;background:var(--tint)}
+.ck .act:hover{border-color:var(--brand)}
+.cksec{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin:14px 0 8px}
 </style>
 </head>
 <body>
@@ -704,6 +732,111 @@ const Avatar=({emp,photo,size=38,dark})=>(
      boxShadow:dark?"inset 0 0 0 1px rgba(255,255,255,.25)":"none"}}>{initials(emp.name)}</div>
 );
 
+/* ══════════ ອ່ານໄຟລ໌ຈາກລະບົບ ທພລ ══════════ */
+const ICheck=p=><I d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" {...p}/>;
+const IUp=p=><I d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" {...p}/>;
+
+const normTime=v=>{
+  if(v===null||v===undefined)return"";
+  let t=String(v).trim();
+  if(!t||t==="-"||t==="—"||t.toLowerCase()==="nan")return"";
+  const m=t.match(/(\d{1,2}):(\d{2})/);
+  return m?`${pad(Number(m[1]))}:${m[2]}`:"";
+};
+const normDate=v=>{
+  if(v===null||v===undefined)return"";
+  if(v instanceof Date) return `${v.getFullYear()}-${pad(v.getMonth()+1)}-${pad(v.getDate())}`;
+  const t=String(v).trim();
+  let m=t.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return `${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`;
+  m=t.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m) return `${m[3]}-${pad(Number(m[2]))}-${pad(Number(m[1]))}`;
+  return "";
+};
+const pickCols=head=>{
+  const f=k=>head.findIndex(h=>h&&String(h).indexOf(k)>-1);
+  return {d:f("ວັນທີ"),i:f("ກົດເຂົ້າ"),o:f("ກົດອອກ"),n:f("ຊື່")};
+};
+const rowsToHR=(head,body)=>{
+  const c=pickCols(head);
+  if(c.d<0) return null;
+  const out=[];
+  body.forEach(r=>{
+    const date=normDate(r[c.d]);
+    if(!date)return;
+    out.push({date,cin:normTime(r[c.i]),cout:normTime(r[c.o]),name:c.n>-1?String(r[c.n]||"").trim():""});
+  });
+  return out;
+};
+/* ໄຟລ໌ .xls ຂອງ ທພລ ຕົວຈິງແມ່ນ HTML — ຮອງຮັບທັງສອງແບບ */
+async function readHRFile(file){
+  const buf=await file.arrayBuffer();
+  const head4=new Uint8Array(buf.slice(0,2));
+  if(head4[0]===0x50&&head4[1]===0x4B){          // PK → xlsx ແທ້
+    const wb=new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const ws=wb.worksheets[0];
+    const rows=[];
+    ws.eachRow(r=>{
+      const v=[];
+      r.eachCell({includeEmpty:true},c=>v.push(c.value&&c.value.text?c.value.text:c.value));
+      rows.push(v);
+    });
+    if(!rows.length) return null;
+    return rowsToHR(rows[0].map(x=>String(x||"")),rows.slice(1));
+  }
+  const text=new TextDecoder("utf-8").decode(buf);
+  const doc=new DOMParser().parseFromString(text,"text/html");
+  const table=doc.querySelector("table");
+  if(!table) return null;
+  const trs=[...table.querySelectorAll("tr")];
+  if(trs.length<2) return null;
+  const head=[...trs[0].children].map(c=>c.textContent.trim());
+  const body=trs.slice(1).map(tr=>[...tr.children].map(c=>c.textContent.trim()));
+  return rowsToHR(head,body);
+}
+
+/* ທຽບຂໍ້ມູນເຮົາ ກັບ ທພລ */
+function buildDiff(hr,ours){
+  const dates=hr.map(r=>r.date).sort();
+  const from=dates[0],to=dates[dates.length-1];
+  const mine=ours.filter(e=>e.date>=from&&e.date<=to);
+  const byDate={};
+  mine.forEach(e=>{(byDate[e.date]=byDate[e.date]||[]).push(e)});
+  const items=[];
+  let ok=0;
+
+  hr.forEach(h=>{
+    const g=byDate[h.date];
+    if(!g||!g.length){
+      const noOT=!h.cout||toM(h.cout)<toM("17:30");
+      if(!noOT) items.push({type:"missing",date:h.date,hrIn:h.cin,hrOut:h.cout});
+      return;
+    }
+    g.forEach((e,k)=>{
+      if(k>0){items.push({type:"dupe",date:e.date,id:e.id,myIn:e.clockIn,myOut:e.endTime,note:e.remarks});return}
+      const dIn=(e.clockIn||"")!==(h.cin||""), dOut=(e.endTime||"")!==(h.cout||"");
+      if(dIn||dOut) items.push({type:"diff",date:e.date,id:e.id,myIn:e.clockIn,myOut:e.endTime,
+                                hrIn:h.cin,hrOut:h.cout,dIn,dOut});
+      else ok++;
+    });
+  });
+
+  const hrDates=new Set(hr.map(r=>r.date));
+  mine.forEach(e=>{if(!hrDates.has(e.date)) items.push({type:"extra",date:e.date,id:e.id,myIn:e.clockIn,myOut:e.endTime,note:e.remarks})});
+
+  const order={diff:0,dupe:1,missing:2,extra:3};
+  items.sort((a,b)=>order[a.type]-order[b.type]||(a.date<b.date?-1:1));
+  return{from,to,ok,items,total:hr.length};
+}
+
+const CKMETA={
+  diff   :{c:"#D32F2F",t:"ຕ່າງກັນ"},
+  dupe   :{c:"#EF6C00",t:"ວັນທີຊ້ຳ"},
+  missing:{c:"#F9A825",t:"ຂາດໃນລະບົບເຮົາ"},
+  extra  :{c:"#00897B",t:"ບໍ່ມີໃນ ທພລ"},
+};
+
 /* ══════════ Supabase ══════════ */
 const SUPA=supabase.createClient("https://ffwlrqakhkwvrcqymmnk.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmd2xycWFraGt3dnJjcXltbW5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5OTIwMDQsImV4cCI6MjA5MzU2ODAwNH0.jHBGwov2Nn19z6ZHIkLWqJdqWuBmorEjiN_klMpy-YM");
 const rowToEntry=r=>({id:r.id,date:r.date,startTime:r.start_time,clockIn:r.clock_in||"",clockOut:r.clock_out||"",endTime:r.end_time,remarks:r.remarks||""});
@@ -734,6 +867,7 @@ function App(){
   const[editForm,setEditForm]=useState(blank);
   const[emps,setEmps]=useState(FALLBACK_EMPS);
   const[avMenu,setAvMenu]=useState(false);
+  const[check,setCheck]=useState(null);   /* {open,report,hrName,err} */
   const fileRef=useRef(null),avRef=useRef(null);
 
   const toast=(msg,type="ok")=>{
@@ -902,6 +1036,66 @@ function App(){
     finally{setBusy(null)}
   };
 
+  /* ── ກວດກັບລະບົບ ທພລ ── */
+  const onHRFile=async e=>{
+    const f=e.target.files&&e.target.files[0];
+    e.target.value="";
+    if(!f)return;
+    setBusy("ກຳລັງອ່ານໄຟລ໌ ທພລ...");
+    try{
+      const hr=await readHRFile(f);
+      if(!hr||!hr.length) throw new Error("no rows");
+      const hrName=(hr.find(r=>r.name)||{}).name||"";
+      setCheck({open:true,report:buildDiff(hr,entries[sel]||[]),hrName,file:f.name});
+    }catch(err){
+      console.error(err);
+      setCheck({open:true,err:"ອ່ານໄຟລ໌ບໍ່ໄດ້ — ກວດວ່າແມ່ນໄຟລ໌ທີ່ໂຫຼດຈາກລະບົບ ທພລ ໂດຍກົງ"});
+    }finally{setBusy(null)}
+  };
+
+  const markDone=it=>setCheck(c=>({...c,report:{...c.report,
+    items:c.report.items.map(x=>x===it?{...x,done:true}:x)}}));
+
+  const applyOne=async it=>{
+    if(it.type==="diff"){
+      const{error}=await SUPA.from("ot_entries")
+        .update({clock_in:it.hrIn||null,end_time:it.hrOut}).eq("id",it.id);
+      if(error) throw error;
+      setEntries(p=>({...p,[sel]:(p[sel]||[]).map(e=>e.id===it.id?{...e,clockIn:it.hrIn,endTime:it.hrOut,clockOut:it.hrOut}:e)}));
+    }else if(it.type==="missing"){
+      const we=isWE(it.date);
+      const entry={id:Date.now()+""+Math.floor(Math.random()*999),date:it.date,
+        startTime:we?"08:00":"17:30",clockIn:it.hrIn,clockOut:it.hrOut,endTime:it.hrOut,remarks:""};
+      const{error}=await SUPA.from("ot_entries").insert(entryToRow(sel,entry));
+      if(error) throw error;
+      setEntries(p=>({...p,[sel]:[...(p[sel]||[]),entry]}));
+    }else if(it.type==="dupe"){
+      const{error}=await SUPA.from("ot_entries").delete().eq("id",it.id);
+      if(error) throw error;
+      setEntries(p=>({...p,[sel]:(p[sel]||[]).filter(e=>e.id!==it.id)}));
+    }
+    markDone(it);
+  };
+
+  const fixOne=async it=>{
+    setBusy("ກຳລັງແກ້...");
+    try{await applyOne(it);toast("ແກ້ແລ້ວ")}
+    catch(e){console.error(e);toast("ແກ້ບໍ່ສຳເລັດ","err")}
+    finally{setBusy(null)}
+  };
+
+  const fixAll=async()=>{
+    const todo=check.report.items.filter(x=>!x.done&&(x.type==="diff"||x.type==="missing"));
+    if(!todo.length)return;
+    setBusy(`ກຳລັງແກ້ ${todo.length} ລາຍການ...`);
+    let n=0;
+    try{
+      for(const it of todo){await applyOne(it);n++}
+      toast(`ແກ້ສຳເລັດ ${n} ລາຍການ`);
+    }catch(e){console.error(e);toast(`ແກ້ໄດ້ ${n} ລາຍການ ແລ້ວມີບັນຫາ`,"err")}
+    finally{setBusy(null)}
+  };
+
   const openAdd=()=>{setForm(blank);setShowAdd(true)};
   const openEdit=r=>{setEditId(r.id);setEditForm({date:r.date,startTime:r.startTime,clockIn:r.clockIn||"",clockOut:r.clockOut||"",endTime:r.endTime,remarks:r.remarks||""})};
 
@@ -978,6 +1172,12 @@ function App(){
             <em>→</em>
             <DateField value={endDate} onChange={setEndDate} isMob={isMob} mini/>
           </div>
+        )}
+        {!isMob&&(
+          <label className="btn btn-g" title="ທຽບກັບໄຟລ໌ຈາກລະບົບ ທພລ">
+            <ICheck/> ກວດກັບ ທພລ
+            <input type="file" accept=".xls,.xlsx,.html,.htm" style={{display:"none"}} onChange={onHRFile}/>
+          </label>
         )}
         {!isMob&&<button className="btn btn-g" onClick={doExport}><IDl/> Excel</button>}
         {!isMob&&<button className="btn btn-p" onClick={openAdd}><IPlus/> ເພີ່ມ OT</button>}
@@ -1111,6 +1311,10 @@ function App(){
 
       {isMob&&(
         <div className="mbar">
+          <label className="btn btn-g" style={{flex:1}}>
+            <ICheck/> ກວດ
+            <input type="file" accept=".xls,.xlsx,.html,.htm" style={{display:"none"}} onChange={onHRFile}/>
+          </label>
           <button className="btn btn-g" onClick={doExport}><IDl/> Excel</button>
           <button className="btn btn-p" onClick={openAdd}><IPlus/> ເພີ່ມ OT</button>
         </div>
@@ -1219,6 +1423,93 @@ function App(){
             <div className="modal-f">
               <button className="btn btn-q" onClick={()=>setConfirmId(null)}>ຍົກເລີກ</button>
               <button className="btn btn-d" onClick={()=>del(confirmId)}><IDel s={15}/> ລົບອອກ</button>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
+
+    {/* ══ ຜົນກວດກັບ ທພລ ══ */}
+    {check&&check.open&&(()=>{
+      const rp=check.report;
+      const nameOff=rp&&check.hrName&&emp&&
+        check.hrName.replace(/\s/g,"")!==emp.name.replace(/\s/g,"");
+      const left=rp?rp.items.filter(x=>!x.done&&(x.type==="diff"||x.type==="missing")).length:0;
+      const cnt=t=>rp?rp.items.filter(x=>x.type===t).length:0;
+      return(
+        <div className="mask" onClick={e=>{if(e.target===e.currentTarget)setCheck(null)}}>
+          <div className="modal" style={{width:560}}>
+            {isMob&&<div className="grab"/>}
+            <div className="modal-h">
+              <div>
+                <b>ຜົນກວດກັບລະບົບ ທພລ</b>
+                <span>{emp?.name}{rp?` · ${fmtD(rp.from)} – ${fmtD(rp.to)}`:""}</span>
+              </div>
+              <button className="ico" onClick={()=>setCheck(null)} style={{color:"var(--muted)"}}><IX/></button>
+            </div>
+            <div className="modal-b">
+              {check.err&&<div className="warn">{check.err}</div>}
+              {rp&&(<>
+                {nameOff&&(
+                  <div className="ckwarn">
+                    ⚠ ຊື່ໃນໄຟລ໌ແມ່ນ <b>{check.hrName}</b> ແຕ່ພະນັກງານທີ່ເລືອກຢູ່ແມ່ນ <b>{emp.name}</b> — ກວດເບິ່ງວ່າອັບໄຟລ໌ຖືກຄົນບໍ່
+                  </div>
+                )}
+                <div className="sum">
+                  <span style={{color:"#2E7D32"}}>ກົງກັນ <b>{rp.ok}</b></span>
+                  <span style={{color:CKMETA.diff.c}}>ຕ່າງກັນ <b>{cnt("diff")}</b></span>
+                  <span style={{color:CKMETA.dupe.c}}>ວັນທີຊ້ຳ <b>{cnt("dupe")}</b></span>
+                  <span style={{color:CKMETA.missing.c}}>ຂາດ <b>{cnt("missing")}</b></span>
+                  <span style={{color:CKMETA.extra.c}}>ບໍ່ມີໃນ ທພລ <b>{cnt("extra")}</b></span>
+                </div>
+
+                {rp.items.length===0&&(
+                  <div className="warn" style={{background:"#F1FAF2",borderColor:"#C9E6CE",color:"#1B5E20"}}>
+                    ✓ ຂໍ້ມູນກົງກັບລະບົບ ທພລ ທຸກລາຍການ ({rp.ok} ວັນ) ບໍ່ຕ້ອງແກ້ຫຍັງ
+                  </div>
+                )}
+
+                {rp.items.map((it,i)=>{
+                  const m=CKMETA[it.type];
+                  return(
+                    <div className={"ck"+(it.done?" done":"")} key={i} style={{"--c":m.c}}>
+                      <div className="h">
+                        <div className="d num">{fmtD(it.date)}<em>ວັນ{dayL(it.date)}</em></div>
+                        <div className="tag">{it.done?"✓ ແກ້ແລ້ວ":m.t}</div>
+                      </div>
+
+                      {it.type==="diff"&&(
+                        <div className="cmp">
+                          <span><u>ກົດເຂົ້າ</u> {it.dIn?<><s className="num">{it.myIn||"—"}</s> → <b className="num">{it.hrIn||"—"}</b></>:<span className="num">{it.myIn||"—"}</span>}</span>
+                          <span><u>ກົດອອກ</u> {it.dOut?<><s className="num">{it.myOut||"—"}</s> → <b className="num">{it.hrOut||"—"}</b></>:<span className="num">{it.myOut||"—"}</span>}</span>
+                        </div>
+                      )}
+                      {it.type==="missing"&&(
+                        <div className="cmp">
+                          <span><u>ທພລ</u> <span className="num">{it.hrIn||"—"} → {it.hrOut}</span></span>
+                          <span><u>OT ທີ່ຈະໄດ້</u> <b className="num" style={{color:"var(--brand)"}}>
+                            {toS(calcBands(isWE(it.date)?"08:00":"17:30",it.hrOut,it.date).reduce((a,x)=>a+x,0))||"0:00"}</b></span>
+                        </div>
+                      )}
+                      {(it.type==="dupe"||it.type==="extra")&&(
+                        <div className="cmp">
+                          <span><u>ຂອງເຮົາ</u> <span className="num">{it.myIn||"—"} → {it.myOut||"—"}</span></span>
+                          {it.note&&<span><u>ໝາຍເຫດ</u> {it.note}</span>}
+                          {it.type==="extra"&&<span style={{color:"var(--muted)"}}>ຢືນຢັນດ້ວຍ ທພລ ບໍ່ໄດ້ (ວັນພັກ/ວຽກນອກລະບົບ)</span>}
+                        </div>
+                      )}
+
+                      {!it.done&&it.type==="diff"&&<button className="act" onClick={()=>fixOne(it)}>ແກ້ໃຫ້ກົງ ທພລ</button>}
+                      {!it.done&&it.type==="missing"&&<button className="act" onClick={()=>fixOne(it)}>ເພີ່ມລາຍການນີ້</button>}
+                      {!it.done&&it.type==="dupe"&&<button className="act" style={{color:"var(--danger)"}} onClick={()=>fixOne(it)}>ລົບແຖວຊ້ຳ</button>}
+                    </div>
+                  );
+                })}
+              </>)}
+            </div>
+            <div className="modal-f">
+              <button className="btn btn-q" onClick={()=>setCheck(null)}>ປິດ</button>
+              {left>0&&<button className="btn btn-p" style={{flex:2}} onClick={fixAll}>ແກ້ທັງໝົດ ({left})</button>}
             </div>
           </div>
         </div>
